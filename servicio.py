@@ -35,8 +35,8 @@ def postAttachment(url, sessionToken, attachmentName, attachmentBytes):
         'Content-Type': 'application/json'
     }
     response = requests.post(url, verify=False, headers=headers, json=data)
-    print response
-    print response.json()['RequestedObject']['Id']
+    #print response
+    #print response.json()['RequestedObject']['Id']
     return response.json()['RequestedObject']['Id']
 
 def getAttachment(url, sessionToken, iD):
@@ -48,7 +48,7 @@ def getAttachment(url, sessionToken, iD):
         'X-Http-Method-Override': 'GET'
     }
     response = requests.post(url, verify=False, headers=headers)
-    print response
+    #print response
     print response.json()
 
 def getApplicationMetadata(url, sessionToken, applicationId):
@@ -60,8 +60,8 @@ def getApplicationMetadata(url, sessionToken, applicationId):
         'X-Http-Method-Override': 'GET'
     }
     response = requests.post(url, verify=False, headers=headers)
-    print response
-    print response.json()
+    #print response
+    #print response.json()
     return response.json()
 
 def getApplicationFieldDefinition(url, sessionToken, applicationId):
@@ -73,47 +73,24 @@ def getApplicationFieldDefinition(url, sessionToken, applicationId):
         'X-Http-Method-Override': 'GET'
     }
     response = requests.post(url, verify=False, headers=headers)
-    print response
+    #print response
     #print response.json()
     return response
 
-def createJSON(moduleId, msg):
-    valuesId = []
-    values = []
+def createJSONDetalle(moduleId, subformFieldId, msg, subject, fromm, to):
     fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
+
     for field in fd.json():
         if field['RequestedObject']['LevelId']:
                 levelId = field['RequestedObject']['LevelId']
-        elif field['RequestedObject']['Alias'] == 'Texto':
+        if field['RequestedObject']['Alias'] == 'Detalle_del_correo':
             detalle = field['RequestedObject']['Id']
-        elif field['RequestedObject']['Alias'] == 'Adjunto':
-            adjunto = field['RequestedObject']['Id']
-        elif field['RequestedObject']['Alias'] == 'Asunto':
+        if field['RequestedObject']['Alias'] == 'Asunto':
             asunto = field['RequestedObject']['Id']
-        elif field['RequestedObject']['Alias'] == 'De':
+        if field['RequestedObject']['Alias'] == 'De':
             de = field['RequestedObject']['Id']
-        elif field['RequestedObject']['Alias'] == 'Para':
+        if field['RequestedObject']['Alias'] == 'Para':
             para = field['RequestedObject']['Id']
-
-    for part in msg.walk():
-        print part.get_content_type()
-        if part.get_content_type() in allowed_mimetypes:
-
-            '''name = part.get_filename()
-            print name
-
-            data = part.get_payload(decode=True)
-            data2 = part.get_payload(decode=False)
-            f = file('archivines/'+str(name),'wb')
-            f.write(data)
-            iD = postAttachment('https://10.100.107.61', sessionToken, name, data2)
-            json = createJSONUpdate('https://10.100.107.61', sessionToken, 239965, levelId, fieldId, iD)
-            putContent('https://10.100.107.61', sessionToken, json)
-            f.close()
-            attachments.append(name)'''
-        else:
-            print msg
-
 
     data = {
         "Content":{
@@ -121,52 +98,231 @@ def createJSON(moduleId, msg):
             "FieldContents" : {
                  str(detalle): {
                      "Type" : 1,
-                     "Value" : "hola",
+                     "Value" : msg,
                       "FieldId": str(detalle)
                   },
-                  str(adjunto): {
-                      "Type" : 11,
-                      "Value" : values,
-                       "FieldId": str(adjunto)
-                   },
                   str(asunto): {
                       "Type" : 1,
-                      "Value" : "hola",
+                      "Value" : subject,
                        "FieldId": str(asunto)
                    },
                    str(de): {
                        "Type" : 1,
-                       "Value" : "hola",
+                       "Value" : fromm,
                         "FieldId": str(de)
                     },
                     str(para): {
                         "Type" : 1,
-                        "Value" : "hola",
+                        "Value" : to,
                          "FieldId": str(para)
                      }
-                 }
              }
-         }
-    print data
+         },
+         "SubformFieldId": str(subformFieldId)
+     }
+    #print data
     return data
 
-def createJSONUpdate(baseurl, sessionToken,contentId, levelId, fieldId, value):
+
+def createJSON(moduleId, msg):
+    subforms = []
+    values = []
+    valdetalle = ''
+    valasunto = msg['subject']
+    valde = msg['from']
+    valpara = msg['to']
+    valcc = ''
+    if msg['CC']:
+        valcc = msg['CC']
+        #print valcc
+    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
+
+    for field in fd.json():
+        if field['RequestedObject']['LevelId']:
+                levelId = field['RequestedObject']['LevelId']
+        if field['RequestedObject']['Alias'] == 'Texto':
+            detalle = field['RequestedObject']['Id']
+        if field['RequestedObject']['Alias'] == 'Adjunto':
+            adjunto = field['RequestedObject']['Id']
+        if field['RequestedObject']['Alias'] == 'Asunto':
+            asunto = field['RequestedObject']['Id']
+        if field['RequestedObject']['Alias'] == 'De':
+            de = field['RequestedObject']['Id']
+        if field['RequestedObject']['Alias'] == 'Para':
+            para = field['RequestedObject']['Id']
+        if field['RequestedObject']['Alias'] == 'CC':
+            cc = field['RequestedObject']['Id']
+        if field['RequestedObject']['Alias'] == 'Detalle_del_correo':
+            ddc = field['RequestedObject']['Id']
+
+
+    for part in msg.walk():
+        #print part.get_content_type()
+        #print part.get_content_type()
+        if part.get_content_type() in allowed_mimetypes:
+
+            name = part.get_filename()
+            #print name
+            data= part.get_payload(decode=False)
+            #f = file('archivines/'+str(name),'wb')
+            #f.write(data)
+            #f.close()
+            iD = postAttachment(baseurl, sessionToken, name, data)
+            values.append(iD)
+            print iD
+
+            #json = createJSONUpdate(baseurl, sessionToken, 239965, levelId, fieldId, iD)
+            #putContent(baseurl, sessionToken, json)
+
+            #attachments.append(name)
+        if part.get_content_type() == "text/html":
+             body = part.get_payload(decode = True)
+             charset = part.get_content_charset('iso-8859-1')
+             texto = body.decode(charset, 'replace')
+             json = createJSONDetalle(configParser.get('env', 'moduleIdDetalle'), ddc, texto, msg['subject'], msg['from'], msg['to'])
+             subformid = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
+             subforms.append(subformid)
+             valdetalle += texto
+             #print valdetalle
+
+    #print data
+    for subfid in subforms:
+        subformJSON = createJSONSubForm(subfid, configParser.get('env', 'moduleIdDetalle'), values)
+        print subformJSON
+        isSuccessful = putContent(baseurl, sessionToken, subformJSON)
+        print isSuccessful.json()
+
+    data = {
+       "Content":{
+           "LevelId" : levelId,
+           "FieldContents" : {
+                str(detalle): {
+                    "Type" : 1,
+                    "Value" : valdetalle,
+                     "FieldId": str(detalle)
+                 },
+                 str(asunto): {
+                     "Type" : 1,
+                     "Value" : valasunto,
+                      "FieldId": str(asunto)
+                  },
+                  str(cc): {
+                      "Type" : 1,
+                      "Value" : valcc,
+                       "FieldId": str(cc)
+                   },
+                  str(de): {
+                      "Type" : 1,
+                      "Value" : valde,
+                       "FieldId": str(de)
+                   },
+                   str(para): {
+                       "Type" : 1,
+                       "Value" : valpara,
+                        "FieldId": str(para)
+                    },
+                    str(ddc): {
+                        "Type" : 24,
+                        "Value" : subforms,
+                         "FieldId": str(ddc)
+                     },
+
+                     str(adjunto): {
+                         "Type" : 11,
+                         "Value" : values,
+                          "FieldId": str(adjunto)
+                      }
+
+                }
+            }
+        }
+    return data
+
+def createJSONSubForm(subformId, moduleId, attachments):
+    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
+    #print fd.json()
+    for field in fd.json():
+        if field['RequestedObject']['LevelId']:
+                levelId = field['RequestedObject']['LevelId']
+        if field['RequestedObject']['Alias'] == 'Adjunto':
+            adjunto = field['RequestedObject']['Id']
+
+    values = attachments
+
+    data = {
+        "Content":{
+            "Id": subformId ,
+            "LevelId" : levelId,
+            "FieldContents" : {
+                str(adjunto): {
+                    "Type" : 11,
+                    "Value" : values,
+                    "FieldId": adjunto
+                 }
+            }
+         }
+     }
+    return data
+
+
+def createJSONAttachment(baseurl, contentId, moduleId, value):
+    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
+
+    for field in fd.json():
+        if field['RequestedObject']['LevelId']:
+                levelId = field['RequestedObject']['LevelId']
+        if field['RequestedObject']['Alias'] == 'Adjunto':
+            adjunto = field['RequestedObject']['Id']
     registro = getContentById(baseurl, sessionToken, contentId)
-    values = registro.json()['RequestedObject']['FieldContents']['30536']['Value']
+    values = registro.json()['RequestedObject']['FieldContents'][str(adjunto)]['Value']
     if values:
         values.append(value)
     else:
         values = [value]
+
+
+
 
     data = {
         "Content":{
             "Id": contentId ,
             "LevelId" : levelId,
             "FieldContents" : {
-                str(fieldId): {
+                str(adjunto): {
                     "Type" : 11,
                     "Value" : values,
-                     "FieldId": fieldId
+                     "FieldId": adjunto
+                 }
+                 }
+             }
+         }
+    return data
+
+def createJSONMail(baseurl, contentId, moduleId, subformId):
+    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
+
+    for field in fd.json():
+        if field['RequestedObject']['LevelId']:
+                levelId = field['RequestedObject']['LevelId']
+        if field['RequestedObject']['Alias'] == 'Detalle_del_correo':
+            ddc = field['RequestedObject']['Id']
+
+    registro = getContentById(baseurl, sessionToken, contentId)
+    subforms = registro.json()['RequestedObject']['FieldContents'][str(ddc)]['Value']
+    if subforms:
+        subforms.append(subformId)
+    else:
+        subforms = [subformId]
+
+    data = {
+        "Content":{
+            "Id": contentId ,
+            "LevelId" : levelId,
+            "FieldContents" : {
+                str(ddc): {
+                    "Type" : 24,
+                    "Value" : subforms,
+                     "FieldId": str(ddc)
                  }
                  }
              }
@@ -183,7 +339,7 @@ def postContent(url, sessionToken, content):
         'Content-Type': 'application/json'
     }
     response = requests.post(url, verify=False, headers=headers, json=data)
-    print response.json()
+    #print response.json()
     return response
 
 
@@ -207,12 +363,29 @@ def getContentById(url, sessionToken, contentId):
         'X-Http-Method-Override': 'GET'
     }
     response = requests.post(url, verify=False, headers=headers)
-    print response
+    #print response
     return response
 
 #############################################################################################################################################
 #############################################################################################################################################
 #############################################################################################################################################
+def createPOPConn():
+    pop_conn = poplib.POP3_SSL(configParser.get('env', 'servername'))
+    pop_conn.user(configParser.get('env', 'email'))
+    pop_conn.pass_(configParser.get('env', 'emailpassword'))
+    return pop_conn
+
+def deleteMail(msg):
+    isSuccessful = False
+    pop_conn = createPOPConn()
+    for i in range(1, len(pop_conn.list()[1]) + 1):
+        mssg = pop_conn.retr(i)
+        mssg = "\n".join(mssg[1])
+        mssg = parser.Parser().parsestr(mssg)
+        if mssg['Message-ID'] == msg['Message-ID'] and mssg['date'] == msg['date']:
+            pop_conn.dele(i)
+
+    pop_conn.quit()
 
 def fetchMail(pop_conn, delete_after=False):
     #Get messages from server:
@@ -226,30 +399,86 @@ def fetchMail(pop_conn, delete_after=False):
     pop_conn.quit()
     return messages
 
-def getAttachments(pop_conn):
-    allowed_mimetypes = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","image/png","image/jpg", "image/jpeg"]
+def createRecord(pop_conn):
+    #allowed_mimetypes = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","image/png","image/jpg", "image/jpeg"]
     messages = fetchMail(pop_conn)
+
     attachments = []
+    print len(messages)
+
     for msg in messages:
         #print msg
-        createJSON(425, msg)
+        isSuccessful = False
 
-    return attachments
+        try:
+            if 'Ticket#' in msg['subject'] and getContentById(baseurl, sessionToken, msg['subject'].split("#")[1]).json()['IsSuccessful']:
+                isSuccessful = updateRecords(msg['subject'].split("#")[1], configParser.get('env', 'moduleIdTickets'), msg)
+
+            else:
+                json = createJSON(configParser.get('env', 'moduleIdTickets'), msg)
+                isSuccessful = postContent(baseurl, sessionToken, json)
+
+            if isSuccessful:
+                    deleteMail(msg)
+
+        except KeyError:
+            print "Ocurrio KeyError:"
+    '''if False is not in isSuccessful:
+        fetchMail(pop_conn, delete_after = true)'''
+
+
+def updateRecords(contentId, moduleId, msg):
+    values = []
+    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
+    isSuccessful = False
+
+    for field in fd.json():
+        if field['RequestedObject']['Alias'] == 'Detalle_del_correo':
+            ddc = field['RequestedObject']['Id']
+
+    for part in msg.walk():
+        if part.get_content_type() in allowed_mimetypes:
+            name = part.get_filename()
+            data= part.get_payload(decode=False)
+            iD = postAttachment(baseurl, sessionToken, name, data)
+            #json = createJSONAttachment(baseurl, contentId, moduleId, iD)
+            #putContent(baseurl, sessionToken, json)
+
+            values.append(iD)
+
+
+        if part.get_content_type() == "text/html":
+             body = part.get_payload(decode = True)
+             charset = part.get_content_charset('iso-8859-1')
+             texto = body.decode(charset, 'replace')
+             json = createJSONDetalle(configParser.get('env', 'moduleIdDetalle'), ddc, texto, msg['subject'], msg['from'], msg['to'])
+             subformId = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
+
+
+             json2 = createJSONMail(baseurl, contentId, moduleId, subformId)
+             putContent(baseurl, sessionToken, json2)
+
+    subformJSON = createJSONSubForm(subformId, configParser.get('env', 'moduleIdDetalle'), values)
+    print subformId
+    print subformJSON
+    req = putContent(baseurl, sessionToken, subformJSON)
+    isSuccessful = req.json()['IsSuccessful']
+    print req.json()
+    return isSuccessful
 
 #############################################################################################################################################
 #############################################################################################################################################
 #############################################################################################################################################
 
-baseurl = 'https://10.100.107.61'
+baseurl = configParser.get('env', 'archerurl')
+allowed_mimetypes = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","image/png","image/jpg", "image/jpeg"]
 
-#pop_conn = poplib.POP3_SSL(configParser.get('env', 'servername'))
-#pop_conn.user(configParser.get('env', 'email'))
-#pop_conn.pass_(configParser.get('env', 'emailpassword'))
+pop_conn = createPOPConn()
 
 #getAttachments(pop_conn)
 #print (pop_conn.getwelcome())
 
 sessionToken = getSessionToken(baseurl, configParser.get('env', 'archerusername'), configParser.get('env', 'archerinstancename'), configParser.get('env', 'archerpassword'))
 
-hola = createJSON(configParser.get('env', 'moduleIdTickets'))
-postContent(baseurl, sessionToken, hola)
+createRecord(pop_conn)
+#print getContentById(baseurl, sessionToken, 240420).json()
