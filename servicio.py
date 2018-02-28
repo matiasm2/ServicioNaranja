@@ -186,11 +186,12 @@ def createJSON(moduleId, msg):
              #print valdetalle
 
     #print data
+    '''
     for subfid in subforms:
         subformJSON = createJSONSubForm(subfid, configParser.get('env', 'moduleIdDetalle'), values)
         print subformJSON
         isSuccessful = putContent(baseurl, sessionToken, subformJSON)
-        print isSuccessful.json()
+        print isSuccessful.json()'''
 
     data = {
        "Content":{
@@ -225,18 +226,12 @@ def createJSON(moduleId, msg):
                         "Type" : 24,
                         "Value" : subforms,
                          "FieldId": str(ddc)
-                     },
-
-                     str(adjunto): {
-                         "Type" : 11,
-                         "Value" : values,
-                          "FieldId": str(adjunto)
-                      }
+                     }
 
                 }
             }
         }
-    return data
+    return [data, subforms, values]
 
 def createJSONSubForm(subformId, moduleId, attachments):
     fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
@@ -411,12 +406,29 @@ def createRecord(pop_conn):
         isSuccessful = False
 
         try:
-            if 'Ticket#' in msg['subject'] and getContentById(baseurl, sessionToken, msg['subject'].split("#")[1]).json()['IsSuccessful']:
-                isSuccessful = updateRecords(msg['subject'].split("#")[1], configParser.get('env', 'moduleIdTickets'), msg)
+            if 'Ticket#' in msg['subject']:
+                contentId = msg['subject'].split("#")[1]
+                if ' ' in msg['subject']:
+                    contentId = msg['subject'].split("#")[1].split(' ')[0]
+                    print contentId
+
+                if  getContentById(baseurl, sessionToken, contentId).json()['IsSuccessful']:
+                    isSuccessful = updateRecords(contentId, configParser.get('env', 'moduleIdTickets'), msg)
 
             else:
-                json = createJSON(configParser.get('env', 'moduleIdTickets'), msg)
-                isSuccessful = postContent(baseurl, sessionToken, json)
+                info = createJSON(configParser.get('env', 'moduleIdTickets'), msg)
+                print info
+                isSuccessful = postContent(baseurl, sessionToken, info[0]).json()
+                print isSuccessful
+                isSuccessful = isSuccessful['IsSuccessful']
+
+                for subfid in info[1]:
+                    subform = createJSONSubForm(subfid, configParser.get('env', 'moduleIdDetalle'), info[2])
+                    req = putContent(baseurl, sessionToken, subform)
+                    isSuccessful = req.json()
+                    print isSuccessful
+                    isSuccessful = isSuccessful['IsSuccessful']
+
 
             if isSuccessful:
                     deleteMail(msg)

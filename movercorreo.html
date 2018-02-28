@@ -1,0 +1,87 @@
+<script type="text/javascript">
+    $(document).ready(function() {
+        if ( ! window.console ) console = { log: function(){} };
+        var debugging = true;
+        String.prototype.format = function() {
+            var s = this,
+            i = arguments.length;
+            while (i--) {
+                s = s.replace(new RegExp('\\{' + i + '\\}', 'gm'), arguments[i]);
+            }
+            return s;
+        };
+
+        boton = '<a title="Cambiar de ticket" class="ml-command-item add-new" id="master_DefaultContent_rts_s8628_cambiardeticket"  href="javascript:void(0);">Cambiar de Ticket</a>';
+        span = '<span class="ml-command-item-divider First">|</span>';
+        span2 = '<span class="ml-command-item-divider Last">|</span>';
+        console.log($('#master_DefaultContent_rts_s8628_commands').html);
+        //$(boton).appendTo('#master_DefaultContent_rts_s8628_commands')
+        div = document.getElementById('master_DefaultContent_rts_s8628_commands');
+        div.innerHTML += span2+boton+span;
+        $('#master_DefaultContent_rts_s8628_cambiardeticket').click(function(){
+            parsedURL = location.href.split('/');
+            contentId = parsedURL[parsedURL.length-1];
+            applicationId = parsedURL[parsedURL.length-3];
+            content = getContentById(contentId);
+            fieldD = getFieldDefinition(applicationId);
+
+            console.log(content);
+            console.log(fieldD);
+
+            //contentId = prompt('Ingrese el Id del Ticket <000000>');
+            //alert('Ingreso el id= '+contentId);
+        });
+    });
+
+    function getContentById(contentId){
+        var content = '';
+        var baseURL = '{0}//{1}'.format(window.location.protocol, window.location.host);
+        //url: baseURL+'/api/core/security/login',
+        $.ajax({
+            type: 'GET',
+            url: baseURL+'/api/core/content/'+contentId,
+            contentType: 'application/json',
+            processData: false,
+            dataType: 'json',
+            success: function(data, textStatus, jqXHR) {
+                if(data.IsSuccessful == true) {
+                  console.log(data);
+                  content = data;
+                }
+            },
+            error: function(jqXHR, textStatus, errorThorwn) {
+                console.log('Fallo');
+                console.log(jqXHR);
+                console.log(textStatus);
+                console.log(errorThorwn);
+            }
+        });
+        return content;
+    }
+
+    function getFieldDefinition(applicationId){
+        var fieldD = '';
+        var baseURL = '{0}//{1}'.format(window.location.protocol, window.location.host);
+        //url: baseURL+'/api/core/security/login',
+        $.ajax({
+            type: 'GET',
+            url: baseURL+'/api/core/system/fielddefinition/application/'+aplicationId,
+            contentType: 'application/json',
+            processData: false,
+            dataType: 'json',
+            success: function(data, textStatus, jqXHR) {
+                if(data.IsSuccessful == true) {
+                  console.log(data);
+                  fieldD = data;
+                }
+            },
+            error: function(jqXHR, textStatus, errorThorwn) {
+                console.log('Fallo');
+                console.log(jqXHR);
+                console.log(textStatus);
+                console.log(errorThorwn);
+            }
+        });
+        return fieldD;
+    }
+</script>
