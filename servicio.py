@@ -77,7 +77,7 @@ def getApplicationFieldDefinition(url, sessionToken, applicationId):
     #print response.json()
     return response
 
-def createJSONDetalle(moduleId, subformFieldId, msg, subject, fromm, to):
+def createJSONDetalle(moduleId, subformFieldId, msg, subject, fromm, to, cc):
     fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
 
     for field in fd.json():
@@ -91,6 +91,8 @@ def createJSONDetalle(moduleId, subformFieldId, msg, subject, fromm, to):
             de = field['RequestedObject']['Id']
         if field['RequestedObject']['Alias'] == 'Para':
             para = field['RequestedObject']['Id']
+        if field['RequestedObject']['Alias'] == 'CC':
+            ccId = field['RequestedObject']['Id']
 
     data = {
         "Content":{
@@ -115,7 +117,12 @@ def createJSONDetalle(moduleId, subformFieldId, msg, subject, fromm, to):
                         "Type" : 1,
                         "Value" : to,
                          "FieldId": str(para)
-                     }
+                     },
+                     str(ccId): {
+                         "Type" : 1,
+                         "Value" : cc,
+                          "FieldId": str(ccId)
+                      }
              }
          },
          "SubformFieldId": str(subformFieldId)
@@ -179,7 +186,10 @@ def createJSON(moduleId, msg):
              body = part.get_payload(decode = True)
              charset = part.get_content_charset('iso-8859-1')
              texto = body.decode(charset, 'replace')
-             json = createJSONDetalle(configParser.get('env', 'moduleIdDetalle'), ddc, texto, msg['subject'], msg['from'], msg['to'])
+             valcc = ''
+             if msg['CC']:
+                 valcc = msg['CC']
+             json = createJSONDetalle(configParser.get('env', 'moduleIdDetalle'), ddc, texto, msg['subject'], msg['from'], msg['to'], valcc)
              subformid = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
              subforms.append(subformid)
              valdetalle += texto
@@ -463,7 +473,10 @@ def updateRecords(contentId, moduleId, msg):
              body = part.get_payload(decode = True)
              charset = part.get_content_charset('iso-8859-1')
              texto = body.decode(charset, 'replace')
-             json = createJSONDetalle(configParser.get('env', 'moduleIdDetalle'), ddc, texto, msg['subject'], msg['from'], msg['to'])
+             valcc = ''
+             if msg['CC']:
+                 valcc = msg['CC']
+             json = createJSONDetalle(configParser.get('env', 'moduleIdDetalle'), ddc, texto, msg['subject'], msg['from'], msg['to'], valcc)
              subformId = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
 
 
@@ -483,7 +496,7 @@ def updateRecords(contentId, moduleId, msg):
 #############################################################################################################################################
 
 baseurl = configParser.get('env', 'archerurl')
-allowed_mimetypes = ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","image/png","image/jpg", "image/jpeg"]
+allowed_mimetypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/pdf', 'text/csv', 'image/png', 'image/jpeg', 'image/gif']
 
 pop_conn = createPOPConn()
 
