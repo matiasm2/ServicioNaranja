@@ -6,6 +6,26 @@ configParser = ConfigParser.RawConfigParser()
 configFilePath = "./env.cfg"
 configParser.read(configFilePath)
 
+ticketsIds = {
+    "levelId": 369,
+    "asunto": 30542,
+    "cc": 30670,
+    "de": 30663,
+    "ddc": 31876,
+    "para": 30664
+}
+ddcIds = {
+    "levelId": 375,
+    "adjunto": 31881,
+    "asunto": 31880,
+    "cuerpo": 31884,
+    "de" : 31889,
+    "para" : 31890,
+    "cc" : 31891,
+    "obs": 31893
+}
+
+
 def getSessionToken(url, userName, instanceName, password):
     url = url+'/api/core/security/login'
     data = {
@@ -20,7 +40,7 @@ def getSessionToken(url, userName, instanceName, password):
     }
     response = requests.post(url, verify=False, headers=headers, json=data)
     #print response
-    #print response.json()['RequestedObject']['SessionToken']
+    print response.json()
     return response.json()['RequestedObject']['SessionToken']
 
 def postAttachment(url, sessionToken, attachmentName, attachmentBytes):
@@ -36,7 +56,7 @@ def postAttachment(url, sessionToken, attachmentName, attachmentBytes):
     }
     response = requests.post(url, verify=False, headers=headers, json=data)
     #print response
-    #print response.json()['RequestedObject']['Id']
+    print response.json()
     return response.json()['RequestedObject']['Id']
 
 def getAttachment(url, sessionToken, iD):
@@ -48,7 +68,7 @@ def getAttachment(url, sessionToken, iD):
         'X-Http-Method-Override': 'GET'
     }
     response = requests.post(url, verify=False, headers=headers)
-    #print response
+    print response.json()
     print response.json()
 
 def getApplicationMetadata(url, sessionToken, applicationId):
@@ -61,7 +81,7 @@ def getApplicationMetadata(url, sessionToken, applicationId):
     }
     response = requests.post(url, verify=False, headers=headers)
     #print response
-    #print response.json()
+    print response.json()
     return response.json()
 
 def getApplicationFieldDefinition(url, sessionToken, applicationId):
@@ -74,25 +94,17 @@ def getApplicationFieldDefinition(url, sessionToken, applicationId):
     }
     response = requests.post(url, verify=False, headers=headers)
     #print response
-    #print response.json()
+    print response.json()
     return response
 
-def createJSONDetalle(moduleId, subformFieldId, msg, subject, fromm, to, cc):
-    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
-
-    for field in fd.json():
-        if field['RequestedObject']['LevelId']:
-                levelId = field['RequestedObject']['LevelId']
-        if field['RequestedObject']['Alias'] == 'Detalle_del_correo':
-            detalle = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'Asunto':
-            asunto = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'De':
-            de = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'Para':
-            para = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'CC':
-            ccId = field['RequestedObject']['Id']
+def createJSONDetalle(msg, subject, fromm, to, cc, obs):
+    levelId = ddcIds['levelId']
+    detalle = ddcIds['cuerpo']
+    asunto = ddcIds['asunto']
+    de = ddcIds['de']
+    para = ddcIds['para']
+    ccc = ddcIds['cc']
+    obss = ddcIds['obs']
 
     data = {
         "Content":{
@@ -118,14 +130,18 @@ def createJSONDetalle(moduleId, subformFieldId, msg, subject, fromm, to, cc):
                         "Value" : to,
                          "FieldId": str(para)
                      },
-                     str(ccId): {
-                         "Type" : 1,
-                         "Value" : cc,
-                          "FieldId": str(ccId)
-                      }
+                    str(ccc):{
+                      "Type" : 1,
+                      "Value" : cc,
+                      "FieldId" : str(ccc)
+                    },
+                    str(obss):{
+                      "Type" : 1,
+                      "Value" : obs,
+                      "FieldId" : str(obss)
+                    }
              }
-         },
-         "SubformFieldId": str(subformFieldId)
+         }
      }
     #print data
     return data
@@ -142,34 +158,30 @@ def createJSON(moduleId, msg):
     if msg['CC']:
         valcc = msg['CC']
         #print valcc
-    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
+    levelId = ticketsIds['levelId']
+    ddc = ticketsIds['ddc']
+    asunto = ticketsIds['asunto']
+    cc = ticketsIds['cc']
+    de = ticketsIds['de']
+    para = ticketsIds['para']
 
-    for field in fd.json():
-        if field['RequestedObject']['LevelId']:
-                levelId = field['RequestedObject']['LevelId']
-        if field['RequestedObject']['Alias'] == 'Texto':
-            detalle = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'Adjunto':
-            adjunto = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'Asunto':
-            asunto = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'De':
-            de = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'Para':
-            para = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'CC':
-            cc = field['RequestedObject']['Id']
-        if field['RequestedObject']['Alias'] == 'Detalle_del_correo':
-            ddc = field['RequestedObject']['Id']
+
 
 
     for part in msg.walk():
         #print part.get_content_type()
         #print part.get_content_type()
+        print '\n'
+        print  part.get_content_type()
+        print part.get_payload(decode=False)
+        obs = ''
         if part.get_content_type() in allowed_mimetypes:
-
-            name = part.get_filename()
-            #print name
+            charset = part.get_content_charset('iso-8859-1')
+            name = part.get_filename(decode=False)
+            name = name.decode(charset, 'replace')
+            if '?' in name:
+                name = name.split('?')[3]
+            print name
             data= part.get_payload(decode=False)
             #f = file('archivines/'+str(name),'wb')
             #f.write(data)
@@ -182,16 +194,19 @@ def createJSON(moduleId, msg):
             #putContent(baseurl, sessionToken, json)
 
             #attachments.append(name)
+        if part.get_content_type() not in allowed_mimetypes and part.get_content_type() not in ["text/html", "text/plain", "multipart/alternative", "multipart/mixed"]:
+            obs += 'Se encontro un adjunto ' + part.get_content_type() + ' que no se pudo cargar.'
+
         if part.get_content_type() == "text/html":
-             body = part.get_payload(decode = True)
              charset = part.get_content_charset('iso-8859-1')
+             body = part.get_payload(decode = True)
              texto = body.decode(charset, 'replace')
              valcc = ''
              if msg['CC']:
                  valcc = msg['CC']
-             json = createJSONDetalle(configParser.get('env', 'moduleIdDetalle'), ddc, texto, msg['subject'], msg['from'], msg['to'], valcc)
+             json = createJSONDetalle(texto, msg['subject'], msg['from'], msg['to'], valcc, obs)
              subformid = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
-             subforms.append(subformid)
+             subforms.append({"ContentID": subformid})
              valdetalle += texto
              #print valdetalle
 
@@ -207,56 +222,46 @@ def createJSON(moduleId, msg):
        "Content":{
            "LevelId" : levelId,
            "FieldContents" : {
-                str(detalle): {
-                    "Type" : 1,
-                    "Value" : valdetalle,
-                     "FieldId": str(detalle)
-                 },
-                 str(asunto): {
-                     "Type" : 1,
-                     "Value" : valasunto,
-                      "FieldId": str(asunto)
-                  },
-                  str(cc): {
-                      "Type" : 1,
-                      "Value" : valcc,
-                       "FieldId": str(cc)
-                   },
-                  str(de): {
-                      "Type" : 1,
-                      "Value" : valde,
-                       "FieldId": str(de)
-                   },
-                   str(para): {
-                       "Type" : 1,
-                       "Value" : valpara,
-                        "FieldId": str(para)
-                    },
                     str(ddc): {
-                        "Type" : 24,
+                        "Type" : 9,
                         "Value" : subforms,
                          "FieldId": str(ddc)
-                     }
+                     },
+                    str(asunto): {
+                       "Type" : 1,
+                       "Value" : valasunto,
+                        "FieldId": str(asunto)
+
+                    },
+                    str(cc):{
+                       "Type" : 1,
+                       "Value" : valcc,
+                        "FieldId": str(cc)
+                    },
+                    str(de):{
+                       "Type": 1,
+                       "Value" : valde,
+                       "FieldId": str(de)
+                    },
+                    str(para):{
+                       "Type" : 1,
+                       "Value" : valpara,
+                       "FieldId" : str(para)
+                    }
 
                 }
             }
         }
     return [data, subforms, values]
 
-def createJSONSubForm(subformId, moduleId, attachments):
-    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
-    #print fd.json()
-    for field in fd.json():
-        if field['RequestedObject']['LevelId']:
-                levelId = field['RequestedObject']['LevelId']
-        if field['RequestedObject']['Alias'] == 'Adjunto':
-            adjunto = field['RequestedObject']['Id']
-
+def createJSONSubForm(ddcId, attachments):
+    levelId = ddcIds['levelId']
+    adjunto = ddcIds['adjunto']
     values = attachments
 
     data = {
         "Content":{
-            "Id": subformId ,
+            "Id": ddcId ,
             "LevelId" : levelId,
             "FieldContents" : {
                 str(adjunto): {
@@ -271,13 +276,8 @@ def createJSONSubForm(subformId, moduleId, attachments):
 
 
 def createJSONAttachment(baseurl, contentId, moduleId, value):
-    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
-
-    for field in fd.json():
-        if field['RequestedObject']['LevelId']:
-                levelId = field['RequestedObject']['LevelId']
-        if field['RequestedObject']['Alias'] == 'Adjunto':
-            adjunto = field['RequestedObject']['Id']
+    levelId = ddcIds['levelId']
+    adjunto = ddcIds['adjunto']
     registro = getContentById(baseurl, sessionToken, contentId)
     values = registro.json()['RequestedObject']['FieldContents'][str(adjunto)]['Value']
     if values:
@@ -304,20 +304,17 @@ def createJSONAttachment(baseurl, contentId, moduleId, value):
     return data
 
 def createJSONMail(baseurl, contentId, moduleId, subformId):
-    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
+    levelId = ticketsIds['levelId']
+    ddc = ticketsIds['ddc']
 
-    for field in fd.json():
-        if field['RequestedObject']['LevelId']:
-                levelId = field['RequestedObject']['LevelId']
-        if field['RequestedObject']['Alias'] == 'Detalle_del_correo':
-            ddc = field['RequestedObject']['Id']
 
     registro = getContentById(baseurl, sessionToken, contentId)
     subforms = registro.json()['RequestedObject']['FieldContents'][str(ddc)]['Value']
+    print subforms
     if subforms:
-        subforms.append(subformId)
+        subforms.append({"ContentID": subformId})
     else:
-        subforms = [subformId]
+        subforms = [{"ContentID": subformId}]
 
     data = {
         "Content":{
@@ -325,13 +322,15 @@ def createJSONMail(baseurl, contentId, moduleId, subformId):
             "LevelId" : levelId,
             "FieldContents" : {
                 str(ddc): {
-                    "Type" : 24,
+                    "Type" : 9,
                     "Value" : subforms,
                      "FieldId": str(ddc)
                  }
                  }
              }
          }
+
+    print data
     return data
 
 
@@ -344,7 +343,8 @@ def postContent(url, sessionToken, content):
         'Content-Type': 'application/json'
     }
     response = requests.post(url, verify=False, headers=headers, json=data)
-    #print response.json()
+    print response.json()
+
     return response
 
 
@@ -357,6 +357,7 @@ def putContent(url, sessionToken, content):
         'Content-Type': 'application/json'
     }
     response = requests.put(url, verify=False, headers=headers, json=data)
+    print response.json()
     return response
 
 def getContentById(url, sessionToken, contentId):
@@ -368,7 +369,6 @@ def getContentById(url, sessionToken, contentId):
         'X-Http-Method-Override': 'GET'
     }
     response = requests.post(url, verify=False, headers=headers)
-    #print response
     return response
 
 #############################################################################################################################################
@@ -429,15 +429,15 @@ def createRecord(pop_conn):
                 info = createJSON(configParser.get('env', 'moduleIdTickets'), msg)
                 print info
                 isSuccessful = postContent(baseurl, sessionToken, info[0]).json()
+                contentId = isSuccessful['RequestedObject']['Id']
                 print isSuccessful
+
                 isSuccessful = isSuccessful['IsSuccessful']
 
                 for subfid in info[1]:
-                    subform = createJSONSubForm(subfid, configParser.get('env', 'moduleIdDetalle'), info[2])
+                    subform = createJSONSubForm(subfid['ContentID'],  info[2])
                     req = putContent(baseurl, sessionToken, subform)
-                    isSuccessful = req.json()
-                    print isSuccessful
-                    isSuccessful = isSuccessful['IsSuccessful']
+                    isSuccessful = req.json()['IsSuccessful']
 
 
             if isSuccessful:
@@ -449,41 +449,48 @@ def createRecord(pop_conn):
         fetchMail(pop_conn, delete_after = true)'''
 
 
+
 def updateRecords(contentId, moduleId, msg):
     values = []
-    fd = getApplicationFieldDefinition(baseurl, sessionToken, moduleId)
     isSuccessful = False
-
-    for field in fd.json():
-        if field['RequestedObject']['Alias'] == 'Detalle_del_correo':
-            ddc = field['RequestedObject']['Id']
+    ddc = ticketsIds["ddc"]
+    obs = ''
 
     for part in msg.walk():
+        print '\n'
+        print  part.get_content_type()
+        print part.get_payload(decode=False)
         if part.get_content_type() in allowed_mimetypes:
             name = part.get_filename()
+            if '?' in name:
+                name = name.split('?')[3]
+            print name
             data= part.get_payload(decode=False)
+            print name
             iD = postAttachment(baseurl, sessionToken, name, data)
             #json = createJSONAttachment(baseurl, contentId, moduleId, iD)
             #putContent(baseurl, sessionToken, json)
 
             values.append(iD)
 
+        if part.get_content_type() not in allowed_mimetypes and part.get_content_type() not in ["text/html", "text/plain", "multipart/alternative", "multipart/mixed"]:
+            obs += 'Se encontro un adjunto ' + part.get_content_type() + ' que no se pudo cargar.'
 
         if part.get_content_type() == "text/html":
-             body = part.get_payload(decode = True)
              charset = part.get_content_charset('iso-8859-1')
+             body = part.get_payload(decode = True)
              texto = body.decode(charset, 'replace')
              valcc = ''
-             if msg['CC']:
+             if msg['CCL']:
                  valcc = msg['CC']
-             json = createJSONDetalle(configParser.get('env', 'moduleIdDetalle'), ddc, texto, msg['subject'], msg['from'], msg['to'], valcc)
+             json = createJSONDetalle(texto, msg['subject'], msg['from'], msg['to'], valcc, obs)
              subformId = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
 
 
              json2 = createJSONMail(baseurl, contentId, moduleId, subformId)
              putContent(baseurl, sessionToken, json2)
 
-    subformJSON = createJSONSubForm(subformId, configParser.get('env', 'moduleIdDetalle'), values)
+    subformJSON = createJSONSubForm(subformId, values)
     print subformId
     print subformJSON
     req = putContent(baseurl, sessionToken, subformJSON)
@@ -491,12 +498,33 @@ def updateRecords(contentId, moduleId, msg):
     print req.json()
     return isSuccessful
 
+def getEmails(emailsstring):
+    emails = {
+        names: [],
+        emails: []
+    }
+
+    if ',' in emailsstring:
+        emailsstring = emailsstring.split(",")
+        for emailtring in emailsstring:
+            emailaux = enailstring.split("<")
+            emails.names.append(emailaux[0])
+            emais.emails.append(emailaux[1].split(">")[0])
+    else:
+        emailaux = enailsstring.split("<")
+        emails.names.append(emailaux[0])
+        emais.emails.append(emailaux[1].split(">")[0])
+    print emails
+    return emails
+
+
+
 #############################################################################################################################################
 #############################################################################################################################################
 #############################################################################################################################################
 
 baseurl = configParser.get('env', 'archerurl')
-allowed_mimetypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/pdf', 'text/csv', 'image/png', 'image/jpeg', 'image/gif']
+allowed_mimetypes = ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/pdf', 'text/csv', 'image/png', 'image/jpeg', 'image/gif', 'application/x-zip-compressed', 'application/octet-stream']
 
 pop_conn = createPOPConn()
 
