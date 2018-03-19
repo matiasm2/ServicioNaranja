@@ -22,7 +22,9 @@ ddcIds = {
     "de" : 31889,
     "para" : 31890,
     "cc" : 31891,
-    "obs": 31893
+    "obs": 31893,
+    "paramail": 31896,
+    "ccmail": 31895
 }
 
 
@@ -97,7 +99,7 @@ def getApplicationFieldDefinition(url, sessionToken, applicationId):
     print response.json()
     return response
 
-def createJSONDetalle(msg, subject, fromm, to, cc, obs):
+def createJSONDetalle(msg, subject, fromm, to, tomail, cc, ccmail, obs):
     levelId = ddcIds['levelId']
     detalle = ddcIds['cuerpo']
     asunto = ddcIds['asunto']
@@ -105,6 +107,8 @@ def createJSONDetalle(msg, subject, fromm, to, cc, obs):
     para = ddcIds['para']
     ccc = ddcIds['cc']
     obss = ddcIds['obs']
+    mailpara = ddcIds['paramail']
+    mailcc = ddcIds['ccmail']
 
     data = {
         "Content":{
@@ -134,6 +138,16 @@ def createJSONDetalle(msg, subject, fromm, to, cc, obs):
                       "Type" : 1,
                       "Value" : cc,
                       "FieldId" : str(ccc)
+                    },
+                    str(mailpara):{
+                      "Type" : 1,
+                      "Value" : tomail,
+                      "FieldId" : str(mailpara)
+                    },
+                    str(mailcc):{
+                      "Type" : 1,
+                      "Value" : ccmail,
+                      "FieldId" : str(mailcc)
                     },
                     str(obss):{
                       "Type" : 1,
@@ -176,8 +190,7 @@ def createJSON(moduleId, msg):
         print part.get_payload(decode=False)
         obs = ''
         if part.get_content_type() in allowed_mimetypes:
-            charset = part.get_content_charset('iso-8859-1')
-            name = part.get_filename(decode=False)
+            name = part.get_filename()
             name = name.decode(charset, 'replace')
             if '?' in name:
                 name = name.split('?')[3]
@@ -202,9 +215,11 @@ def createJSON(moduleId, msg):
              body = part.get_payload(decode = True)
              texto = body.decode(charset, 'replace')
              valcc = ''
+             valmailcc = ''
              if msg['CC']:
-                 valcc = msg['CC']
-             json = createJSONDetalle(texto, msg['subject'], msg['from'], msg['to'], valcc, obs)
+                valcc = ",".join(getEmails(msg['CC'])['names'])
+                valmailcc =  ";".join(getEmails(msg['to'])['emails'])
+             json = createJSONDetalle(texto, msg['subject'], ",".join(getEmails(msg['from'])['names']), ",".join(getEmails(msg['to'])['names']),  ";".join(getEmails(msg['to'])['emails']), valcc, valmailcc, obs)
              subformid = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
              subforms.append({"ContentID": subformid})
              valdetalle += texto
@@ -441,6 +456,7 @@ def createRecord(pop_conn):
 
 
             if isSuccessful:
+
                     deleteMail(msg)
 
         except KeyError:
@@ -481,9 +497,10 @@ def updateRecords(contentId, moduleId, msg):
              body = part.get_payload(decode = True)
              texto = body.decode(charset, 'replace')
              valcc = ''
-             if msg['CCL']:
-                 valcc = msg['CC']
-             json = createJSONDetalle(texto, msg['subject'], msg['from'], msg['to'], valcc, obs)
+             if msg['CC']:
+                valcc = ",".join(getEmails(msg['CC'])['names'])
+                valmailcc =  ";".join(getEmails(msg['to'])['emails'])
+             json = createJSONDetalle(texto, msg['subject'], ",".join(getEmails(msg['from'])['names']), ",".join(getEmails(msg['to'])['names']),  ";".join(getEmails(msg['to'])['emails']), valcc, valmailcc, obs)
              subformId = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
 
 
@@ -500,22 +517,35 @@ def updateRecords(contentId, moduleId, msg):
 
 def getEmails(emailsstring):
     emails = {
-        names: [],
-        emails: []
+        "names": [],
+        "emails": []
     }
 
     if ',' in emailsstring:
         emailsstring = emailsstring.split(",")
-        for emailtring in emailsstring:
-            emailaux = enailstring.split("<")
-            emails.names.append(emailaux[0])
-            emais.emails.append(emailaux[1].split(">")[0])
+        for emailstring in emailsstring:
+            emailaux = emailstring.split("<")
+            emails['names'].append(emailaux[0])
+            emails['emails'].append(emailaux[1].split(">")[0])
     else:
-        emailaux = enailsstring.split("<")
-        emails.names.append(emailaux[0])
-        emais.emails.append(emailaux[1].split(">")[0])
+        emailaux = emailsstring.split("<")
+        emails['names'].append(emailaux[0])
+        emails['emails'].append(emailaux[1].split(">")[0])
     print emails
     return emails
+
+def apiCall(url, sessionToken, content):
+    url = url+'/api/core/content'
+    data = content
+    headers = {
+        'Accept':'application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Authorization':'Archer session-id='+sessionToken,
+        'Content-Type': 'application/json'
+    }
+    response = requests.post(url, verify=False, headers=headers, json=data)
+    print response.json()
+
+    return response
 
 
 
