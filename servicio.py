@@ -6,7 +6,7 @@ configParser = ConfigParser.RawConfigParser()
 configFilePath = "./env.cfg"
 configParser.read(configFilePath)
 
-ticketsIds = {
+'''ticketsIds = {
     "levelId": 369,
     "asunto": 30542,
     "cc": 30670,
@@ -26,6 +26,29 @@ ddcIds = {
     "paramail": 31896,
     "ccmail": 31895
 }
+dataFeedGuid = "0C12DCCA-BD22-42B5-864A-8522A7DA2E82"'''
+
+ticketsIds = {
+    "levelId": 218, #Ultimo numero de url (/apps/ArcherApp/Home.aspx#search/70/75/542/false/default/368)
+    "asunto": 16716,
+    "cc": 22510,
+    "de": 22508,
+    "ddc": 23864,
+    "para": 22509
+}
+ddcIds = {
+    "levelId": 2266, #Ultimo numero de url (/apps/ArcherApp/Home.aspx#search/70/75/542/false/default/368)
+    "adjunto": 23875,
+    "asunto": 23874,
+    "cuerpo": 23876,
+    "de" : 23877,
+    "para" : 23878,
+    "cc" : 23879,
+    "obs": 23881,
+    "paramail": 23883,
+    "ccmail": 23884
+}
+dataFeedGuid = "0C12DCCA-BD22-42B5-864A-8522A7DA2E82"
 
 
 def getSessionToken(url, userName, instanceName, password):
@@ -166,12 +189,13 @@ def createJSON(moduleId, msg):
     values = []
     valdetalle = ''
     valasunto = msg['subject']
-    valde = msg['from']
-    valpara = msg['to']
+    valde = ",".join(getEmails(msg['from'])['names'])
+    valpara = ''
     valcc = ''
+    if msg['TO']:
+      valpara = ",".join(getEmails(msg['to'])['names'])
     if msg['CC']:
-        valcc = msg['CC']
-        #print valcc
+      valcc = ",".join(getEmails(msg['CC'])['names'])
     levelId = ticketsIds['levelId']
     ddc = ticketsIds['ddc']
     asunto = ticketsIds['asunto']
@@ -468,7 +492,7 @@ def createRecord(pop_conn):
             print "Ocurrio KeyError:"
     print isSuccessful
     if isSuccessful:
-            dfContent = {"DataFeedGuid":"0C12DCCA-BD22-42B5-864A-8522A7DA2E82", "IsReferenceFeedsIncluded": False}
+            dfContent = {"DataFeedGuid": dataFeedGuid, "IsReferenceFeedsIncluded": False}
             apiCall(baseurl+'/api/core/datafeed/execution', headers, dfContent)
 
 
