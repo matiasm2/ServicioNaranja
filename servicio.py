@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import requests, poplib, ConfigParser, sys
 from email import parser
 
@@ -49,24 +52,6 @@ ddcIds = {
     "ccmail": 23884
 }
 dataFeedGuid = "0C12DCCA-BD22-42B5-864A-8522A7DA2E82"
-
-
-def getSessionToken(url, userName, instanceName, password):
-    url = url+'/api/core/security/login'
-    data = {
-        "InstanceName":instanceName,
-        "Username":userName,
-        "UserDomain": "",
-        "Password":password
-    }
-    headers = {
-        'Accept':'application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Content-Type': 'application/json'
-    }
-    response = requests.post(url, verify=False, headers=headers, json=data)
-    #print response
-    print response.json()
-    return response.json()['RequestedObject']['SessionToken']
 
 def postAttachment(url, sessionToken, attachmentName, attachmentBytes):
     url = url+'/api/core/content/attachment'
@@ -187,32 +172,35 @@ def createJSONDetalle(msg, subject, fromm, to, tomail, cc, ccmail, obs):
 def createJSON(moduleId, msg):
     subforms = []
     values = []
-    valdetalle = ''
     valasunto = msg['subject']
     valde = ",".join(getEmails(msg['from'])['names'])
     valpara = ''
     valcc = ''
+    valmailcc = ''
     if msg['TO']:
       valpara = ",".join(getEmails(msg['to'])['names'])
+      tonames = valpara
+      toemails = ";".join(getEmails(msg['to'])['emails'])
     if msg['CC']:
       valcc = ",".join(getEmails(msg['CC'])['names'])
+      valmailcc =  ";".join(getEmails(msg['CC'])['emails'])
     levelId = ticketsIds['levelId']
     ddc = ticketsIds['ddc']
     asunto = ticketsIds['asunto']
     cc = ticketsIds['cc']
     de = ticketsIds['de']
     para = ticketsIds['para']
-
-
-
-
+    hasHTML = False
+    body = ''
+    obs = ''
     for part in msg.walk():
-        obs = ''
+
+        print part.get_content_type()
         if part.get_content_type() in allowed_mimetypes:
             name = part.get_filename()
             name = name.decode(charset, 'replace')
             if '?' in name:
-                name = name.split('?')[3]
+                name = name.split('?')[3].decode('iso-8859-1')
             data= part.get_payload(decode=False)
             #f = file('archivines/'+str(name),'wb')
             #f.write(data)
@@ -230,28 +218,28 @@ def createJSON(moduleId, msg):
             #attachments.append(name)
         if part.get_content_type() not in allowed_mimetypes and part.get_content_type() not in ["text/html", "text/plain", "multipart/alternative", "multipart/mixed"]:
             obs += 'Se encontro un adjunto ' + part.get_content_type() + ' que no se pudo cargar.'
+        if part.get_content_type() == "text/plain":
+            print part.get_payload()
 
+            if part.get_payload().endswith('='):
+                texto = part.get_payload().decode('base64')
+                body = texto
+            else:
+                body = part.get_payload()
         if part.get_content_type() == "text/html":
-             charset = part.get_content_charset('iso-8859-1')
-             body = part.get_payload(decode = True)
-             texto = body.decode(charset, 'replace')
-             valcc = ''
-             valmailcc = ''
-             if msg['TO']:
-               tonames = ",".join(getEmails(msg['to'])['names'])
-               toemails = ";".join(getEmails(msg['to'])['emails'])
-             if msg['CC']:
-               valcc = ",".join(getEmails(msg['CC'])['names'])
-               valmailcc =  ";".join(getEmails(msg['CC'])['emails'])
-             json = createJSONDetalle(texto, msg['subject'], ",".join(getEmails(msg['from'])['names']), tonames,  valmailcc, valcc, toemails, obs)
-             subformid = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
-             subforms.append({"ContentID": subformid})
-             valdetalle += texto
-             #print valdetalle
+            hasHTML=True
+            charset = part.get_content_charset('iso-8859-1')
+            body = part.get_payload(decode = True)
+            texto = body.decode(charset, 'replace')
+            json = createJSONDetalle(texto, msg['subject'], ",".join(getEmails(msg['from'])['names']), tonames,  valmailcc, valcc, toemails, obs)
+            subformid = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
+            subforms.append({"ContentID": subformid})
+    if not hasHTML:
+        json = createJSONDetalle(body, msg['subject'], ",".join(getEmails(msg['from'])['names']), tonames,  valmailcc, valcc, toemails, obs)
+        subformid = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
+        subforms.append({"ContentID": subformid})
 
-    #print data
-    '''
-    for subfid in subforms:
+    '''for subfid in subforms:
         subformJSON = createJSONSubForm(subfid, configParser.get('env', 'moduleIdDetalle'), values)
         print subformJSON
         isSuccessful = putContent(baseurl, sessionToken, subformJSON)
@@ -348,6 +336,7 @@ def createJSONMail(baseurl, contentId, moduleId, subformId):
 
 
     registro = getContentById(baseurl, sessionToken, contentId)
+    print registro.json()
     subforms = registro.json()['RequestedObject']['FieldContents'][str(ddc)]['Value']
     if subforms:
         subforms.append({"ContentID": subformId})
@@ -367,8 +356,6 @@ def createJSONMail(baseurl, contentId, moduleId, subformId):
                  }
              }
          }
-
-    print data
     return data
 
 
@@ -455,7 +442,7 @@ def createRecord(pop_conn):
         #print msg
         if not isSuccessful:
             print 'Fallo'
-            break
+            #break
 
         try:
             if 'Ticket#' in msg['subject']:
@@ -500,12 +487,27 @@ def createRecord(pop_conn):
 
 def updateRecords(contentId, moduleId, msg):
     values = []
+    subformId = ''
     isSuccessful = False
     ddc = ticketsIds["ddc"]
     obs = ''
+    valcc = ''
+    valmailcc = ''
+    tonames = ''
+    toemails = ''
+    if msg['TO']:
+        tonames = ",".join(getEmails(msg['to'])['names'])
+        toemails = ";".join(getEmails(msg['to'])['emails'])
+    if msg['CC']:
+       valcc = ",".join(getEmails(msg['CC'])['names'])
+       valmailcc =  ";".join(getEmails(msg['CC'])['emails'])
+
+    hasHTML = False
+    body = ''
+    obs = ''
 
     for part in msg.walk():
-        obs = ''
+        print part.get_content_type()
         if part.get_content_type() in allowed_mimetypes:
             name = part.get_filename()
             if '?' in name:
@@ -523,40 +525,47 @@ def updateRecords(contentId, moduleId, msg):
 
         if part.get_content_type() not in allowed_mimetypes and part.get_content_type() not in ["text/html", "text/plain", "multipart/alternative", "multipart/mixed"]:
             obs += 'Se encontro un adjunto ' + part.get_content_type() + ' que no se pudo cargar.'
+        if part.get_content_type() == "text/plain":
+            print part.get_payload()
+            if part.get_payload().endswith('='):
+                texto = part.get_payload().decode('base64')
+                json = createJSONDetalle(texto, msg['subject'], ",".join(getEmails(msg['from'])['names']), tonames,  valmailcc, valcc, toemails, obs)
+                subform = postContent(baseurl, sessionToken, json).json()
+                subformId = subform['RequestedObject']['Id']
+                json2 = createJSONMail(baseurl, contentId, moduleId, subformId)
+                req = putContent(baseurl, sessionToken, json2)
+                print req.json()
+                isSuccessful = req.json()['IsSuccessful']
 
         if part.get_content_type() == "text/html":
-             charset = part.get_content_charset('iso-8859-1')
-             body = part.get_payload(decode = True)
-             texto = body.decode(charset, 'replace')
-             valcc = ''
-             valmailcc = ''
-             tonames = ''
-             toemails = ''
-             if msg['TO']:
-                 tonames = ",".join(getEmails(msg['to'])['names'])
-                 toemails = ";".join(getEmails(msg['to'])['emails'])
-             if msg['CC']:
-                valcc = ",".join(getEmails(msg['CC'])['names'])
-                valmailcc =  ";".join(getEmails(msg['CC'])['emails'])
-             json = createJSONDetalle(texto, msg['subject'], ",".join(getEmails(msg['from'])['names']), tonames,  valmailcc, valcc, toemails, obs)
-             subformId = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
+            hasHTML = True
+            charset = part.get_content_charset('iso-8859-1')
+            body = part.get_payload(decode = True)
+            texto = body.decode(charset, 'replace')
+            json = createJSONDetalle(texto, msg['subject'], ",".join(getEmails(msg['from'])['names']), tonames,  valmailcc, valcc, toemails, obs)
+            subformId = postContent(baseurl, sessionToken, json).json()['RequestedObject']['Id']
+            json2 = createJSONMail(baseurl, contentId, moduleId, subformId)
+            req = putContent(baseurl, sessionToken, json2)
+            isSuccessful = req.json()['IsSuccessful']
+            print req.json()
 
+    if not hasHTML:
+        json = createJSONDetalle(body, msg['subject'], ",".join(getEmails(msg['from'])['names']), tonames,  valmailcc, valcc, toemails, obs)
+        subform = postContent(baseurl, sessionToken, json).json()
+        subformId = subform['RequestedObject']['Id']
+        json2 = createJSONMail(baseurl, contentId, moduleId, subformId)
+        req = putContent(baseurl, sessionToken, json2)
+        print req.json()
+        isSuccessful = req.json()['IsSuccessful']
 
-             json2 = createJSONMail(baseurl, contentId, moduleId, subformId)
-             req = putContent(baseurl, sessionToken, json2)
-             print req
-
-    subformJSON = createJSONSubForm(subformId, values)
-    print subformId
-    req = putContent(baseurl, sessionToken, subformJSON)
-    isSuccessful = req.json()['IsSuccessful']
-    print req.json()
+    #subformJSON = createJSONSubForm(subformId, values)
+    #print subformId
+    #req = putContent(baseurl, sessionToken, subformJSON)
+    #isSuccessful = req.json()['IsSuccessful']
+    #print req.json()
     return isSuccessful
 
 def getEmails(emailsstring):
-    print emailsstring
-
-
     if '"' in emailsstring:
         emailsstring = ''.join(emailsstring.split('"'))
     if "\n" in emailsstring:
@@ -621,10 +630,14 @@ allowed_mimetypes = ['application/vnd.openxmlformats-officedocument.wordprocessi
 
 pop_conn = createPOPConn()
 
-#getAttachments(pop_conn)
-#print (pop_conn.getwelcome())
+data = {
+    "InstanceName": configParser.get('env', 'archerinstancename'),
+    "Username": configParser.get('env', 'archerusername'),
+    "UserDomain": "",
+    "Password": configParser.get('env', 'archerpassword')
+}
 
-sessionToken = getSessionToken(baseurl, configParser.get('env', 'archerusername'), configParser.get('env', 'archerinstancename'), configParser.get('env', 'archerpassword'))
+sessionToken = apiCall(baseurl+'/api/core/security/login', getHeaders(), data). json()['RequestedObject']['SessionToken']
 
 createRecord(pop_conn)
 #print getContentById(baseurl, sessionToken, 240420).json()
